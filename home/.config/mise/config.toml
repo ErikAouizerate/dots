@@ -1,0 +1,17 @@
+# Global mise configuration: the dev toolchain lives here, not in the
+# distribution packages. See https://mise.jdx.dev/configuration.html
+
+[settings]
+# Precompiled CPython only, never a source build: with compile enabled, a
+# version prefix like "3.14" falls back to building CPython from source.
+python.compile = false
+# Per-request cap. The 30s default is too tight for the large tool tarballs.
+http_timeout = "300s"
+
+[tools]
+python = "3.14"
+uv = "latest"
+node = "24"
+yarn = "latest"
+pnpm = "latest"
+rust = "stable"
