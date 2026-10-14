@@ -17,15 +17,21 @@ only machine:
 curl -fsSL https://github.com/ErikAouizerate/dots/raw/main/install-fedora.sh | bash -s -- vps
 ```
 
+The `vps` profile installs the same command line tools but none of the
+graphical layer: no package, no configuration for the compositor or the
+desktop, and no starship, so the prompt is oh-my-zsh's own theme.
+
 The script installs `ansible-core` and `git`, clones this repository into
 `~/dots` and runs the playbook. Re-running it is the update command: the
 playbook is idempotent and converges the machine again.
 
 ## How it works
 
-- `home/` mirrors the home directory. The `dotfiles` role walks that tree and
-  symlinks **every** file it finds to the same relative path in `$HOME`, so
-  `home/.config/starship.toml` becomes `~/.config/starship.toml`.
+- `home/` mirrors the home directory on every machine, and `home-workstation/`
+  mirrors it on the workstation profile only. The `dotfiles` role walks both
+  trees and symlinks **every** file it finds to the same relative path in
+  `$HOME`, so `home-workstation/.config/starship.toml` becomes
+  `~/.config/starship.toml`.
 - A file that this repository does not manage yet (a hand-written `~/.zshrc`,
   for instance) is moved to `<file>.bak.<YYYYMMDD-HHMM>` before the link is
   created. Nothing is deleted.
@@ -45,24 +51,26 @@ dots/
 │   ├── inventory.yml           localhost
 │   ├── playbook.yml            the four roles, and the profile switch
 │   └── roles/
-│       ├── base/               CLI packages, mise, starship, zsh/oh-my-zsh, login shell
-│       ├── dotfiles/           the symlinks from home/ into $HOME
+│       ├── base/               CLI packages, mise, zsh/oh-my-zsh, login shell
+│       ├── dotfiles/           the symlinks from both home trees into $HOME
 │       ├── workstation/        the Fedora desktop layer (workstation only)
 │       └── user_tools/         mise runtimes, opencode, plugin dependencies
-└── home/                       mirrors $HOME, symlinked file by file
-    ├── .zshrc
-    ├── .zshenv
-    ├── .gitconfig
+├── home/                       mirrors $HOME on every machine, file by file
+│   ├── .zshrc
+│   ├── .zshenv
+│   ├── .gitconfig
+│   └── .config/
+│       ├── mise/config.toml    python, uv, node, yarn, pnpm, rust
+│       ├── git/hooks/pre-push  secret guardrail, wired by core.hooksPath
+│       └── opencode/           agents, skills, local plugin
+└── home-workstation/           mirrors $HOME on the workstation profile only
     ├── .config/
     │   ├── starship.toml       prompt
-    │   ├── mise/config.toml    python, uv, node, yarn, pnpm, rust
-    │   ├── git/hooks/pre-push  secret guardrail, wired by core.hooksPath
     │   ├── miracle-wm/         compositor keybindings
     │   ├── miracle-wm.config   Mir configuration
     │   ├── libinput-gestures.conf
-    │   ├── xdg-terminals.list
-    │   ├── Code/User/          VSCode settings and keybindings
-    │   └── opencode/           agents, skills, local plugin
+    │   ├── xdg-terminals.list  default terminal (ptyxis)
+    │   └── Code/User/          VSCode settings and keybindings
     └── .local/
         ├── bin/                wm-* compositor helpers
         └── share/applications/ baobab desktop entry
@@ -72,15 +80,15 @@ dots/
 
 | Profile | What it adds |
 | --- | --- |
-| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, Bitwarden (Flatpak), the Ptyxis `dconf` settings, the DankMaterialShell layout and the VSCode extensions |
-| `vps` | nothing beyond `base`, `dotfiles` and `user_tools` |
+| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, starship, Bitwarden (Flatpak), the Ptyxis `dconf` settings, the DankMaterialShell layout and the VSCode extensions |
+| `vps` | nothing beyond `base`, `dotfiles` and `user_tools`: no graphical package and none of the configuration in `home-workstation/`. starship is not installed either, so the prompt is the plain oh-my-zsh theme |
 
 The `workstation` profile expects the **Fedora MiracleWM spin** as its base: it
 installs everything around the desktop but not the compositor, DankMaterialShell
 or their session scripts. The spin's shell therefore keeps its own look unless
 the role patches it: `~/.config/DankMaterialShell/settings.json` is DMS's file,
-rewritten by the shell as it is used, so it is not symlinked from `home/` but
-adjusted with `jq` on every run (`files/dms-settings.jq`): dock off, bar glued
+rewritten by the shell as it is used, so it is not symlinked from the repository
+but adjusted with `jq` on every run (`files/dms-settings.jq`): dock off, bar glued
 to the screen edges, numbered workspaces, window title in the centre, disk usage
 next to memory, 24-hour clock with a short date at the far right. DMS watches
 that file and reloads it, so the layout applies without a relogin, and re-running
@@ -93,13 +101,16 @@ miracle-wm and libinput-gestures exec the commands of their bindings without a
 shell, so they expand neither `~` nor `$HOME`, and the compositor's PATH does not
 contain `~/.local/bin`. The `wm-*` helpers are therefore linked into
 `/usr/local/bin` as well and called by their bare name. No configuration file in
-`home/` carries a home path: they all resolve through `~`, `$HOME` or a PATH
-lookup, so a machine where the user is not `riko` works the same.
+`home/` or `home-workstation/` carries a home path: they all resolve through
+`~`, `$HOME` or a PATH lookup, so a machine where the user is not `riko` works
+the same.
 
 ## Adding a configuration file
 
-Put it in `home/` at the path it should have in `$HOME`. Nothing else to do:
-the next run links it.
+Put it in `home/` at the path it should have in `$HOME`. A file that only makes
+sense on the graphical profile (the compositor, the terminal, VSCode) goes in
+`home-workstation/` instead, and the vps profile never sees it. Nothing else to
+do: the next run links it.
 
 Packages and repositories go in `ansible/roles/*/defaults/main.yml`, which is
 also where the VSCode extension list lives.
@@ -112,7 +123,7 @@ is where secrets, extra aliases and tools installed by hand belong.
 ## Working on the repository
 
 ```sh
-shellcheck -x install-fedora.sh home/.local/bin/wm-* home/.config/git/hooks/pre-push
+shellcheck -x install-fedora.sh home-workstation/.local/bin/wm-* home/.config/git/hooks/pre-push
 ansible-lint ansible/
 ansible-playbook ansible/playbook.yml --syntax-check
 ```

@@ -1,14 +1,15 @@
 # zsh configuration, symlinked from the dots repository.
 # Machine-specific settings go in ~/.zshrc.local (not versioned).
 
-# Oh My Zsh. Its theme only shows up if starship is missing: starship is
-# initialised below and takes the prompt over.
+# Oh My Zsh. Its theme is the prompt of the vps profile: starship is
+# installed by the workstation profile only, is initialised below when present
+# and takes the prompt over.
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 plugins=(git)
 source "$ZSH/oh-my-zsh.sh"
 
-# Prompt (see ~/.config/starship.toml)
+# Prompt on the workstation profile (see ~/.config/starship.toml)
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
 # Per-directory environments (a .envrc in the project)

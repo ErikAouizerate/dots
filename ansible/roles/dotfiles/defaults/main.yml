@@ -4,9 +4,20 @@
 # (a development clone, for instance) links against itself.
 dotfiles_repo_dir: "{{ ansible_facts.env.HOME }}/dots"
 
-# The tree that mirrors the home directory: every file below it is symlinked
-# to the same relative path in $HOME.
-dotfiles_source_dir: "{{ dotfiles_repo_dir }}/home"
+# The tree that mirrors the home directory on every machine: every file below
+# it is symlinked to the same relative path in $HOME.
+dotfiles_common_source_dir: "{{ dotfiles_repo_dir }}/home"
+
+# The desktop layer: the compositor, its helpers and the configuration of the
+# graphical applications. Same rule, second tree, and only the workstation
+# profile links it, so a vps gets none of it.
+dotfiles_workstation_source_dir: "{{ dotfiles_repo_dir }}/home-workstation"
+
+# The trees to link, in order. The profile decides whether the desktop layer is
+# part of them.
+dotfiles_source_dirs: >-
+  {{ [dotfiles_common_source_dir] +
+     ([dotfiles_workstation_source_dir] if profile == 'workstation' else []) }}
 
 # Suffix of the backups taken before replacing a file that this repository does
 # not manage yet, for example ~/.zshrc.bak.20251014-1501.

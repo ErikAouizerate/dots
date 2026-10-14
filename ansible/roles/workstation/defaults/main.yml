@@ -22,6 +22,7 @@ workstation_packages:
   # COPRs enabled by this role
   - fira-code-nerd-fonts
   - libinput-gestures
+  - starship
 
 # The official language extensions only: TypeScript and CSS ride VSCode's
 # built-in support, everything else is one extension per language.

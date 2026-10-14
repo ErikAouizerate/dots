@@ -150,7 +150,7 @@ custom_actions:
   # `wl-paste --watch` all speak wlr-data-control, which Mir does not implement
   # (only ext-data-control), and DMS is an ext-data-control client. It needs
   # that protocol enabled — the `miracle-wm.config` entry in this repository's
-  # home/.config/miracle-wm.config does exactly that; without it the server never advertises its "clipboard"
+  # home-workstation/.config/miracle-wm.config does exactly that; without it the server never advertises its "clipboard"
   # capability and this modal opens empty. The IPC target/verb below is the
   # shell's own (DMSShellIPC.qml, target "clipboard").
   - command: dms ipc call clipboard open

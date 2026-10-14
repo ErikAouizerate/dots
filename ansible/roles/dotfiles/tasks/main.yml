@@ -1,25 +1,31 @@
 ---
-# Link every file of the repository's home/ tree into the real home directory,
-# mirroring the layout. Files that this repository does not manage yet are
-# backed up first, with a timestamped suffix.
+# Link every file of the repository's home trees into the real home directory,
+# mirroring the layout: home/ on every machine, plus home-workstation/ on the
+# workstation profile (see dotfiles_source_dirs). Files that this repository
+# does not manage yet are backed up first, with a timestamped suffix.
 
 - name: List the configuration files of the repository
   ansible.builtin.find:
-    paths: "{{ dotfiles_source_dir }}"
+    paths: "{{ item }}"
     file_type: file
     hidden: true
     recurse: true
-  register: dotfiles_files
+  loop: "{{ dotfiles_source_dirs }}"
+  loop_control:
+    label: "{{ item }}"
+  register: dotfiles_trees
 
+# subelements yields one item per file, paired with the tree it was found in,
+# which is what the relative path is computed against.
 - name: Build the list of links to create
   ansible.builtin.set_fact:
     dotfiles_links: >-
       {{ dotfiles_links | default([]) +
-         [{'src': item,
-           'dest': ansible_facts.env.HOME ~ '/' ~ (item | relpath(dotfiles_source_dir))}] }}
-  loop: "{{ dotfiles_files.files | map(attribute='path') | list }}"
+         [{'src': item.1.path,
+           'dest': ansible_facts.env.HOME ~ '/' ~ (item.1.path | relpath(item.0.item))}] }}
+  loop: "{{ dotfiles_trees.results | subelements('files') }}"
   loop_control:
-    label: "{{ item | relpath(dotfiles_source_dir) }}"
+    label: "{{ item.1.path | relpath(item.0.item) }}"
 
 # ansible.builtin.file does not create the parent directories of a link. The
 # home directory itself is skipped: it always exists, and it must keep the
