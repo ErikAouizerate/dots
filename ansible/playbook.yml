@@ -1,0 +1,26 @@
+---
+- name: Set up the machine
+  hosts: localhost
+  gather_facts: true
+
+  vars:
+    # Machine type. Overridden by install-fedora.sh, or by hand:
+    #   ansible-playbook ansible/playbook.yml -e profile=vps
+    profile: workstation
+
+  pre_tasks:
+    - name: Check that the profile is known
+      ansible.builtin.assert:
+        that: profile in ['workstation', 'vps']
+        fail_msg: "Unknown profile '{{ profile }}' (expected 'workstation' or 'vps')."
+
+  roles:
+    - role: base
+      tags: base
+    - role: dotfiles
+      tags: dotfiles
+    - role: workstation
+      tags: workstation
+      when: profile == 'workstation'
+    - role: user_tools
+      tags: user_tools
