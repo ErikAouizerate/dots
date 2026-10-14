@@ -341,9 +341,16 @@
   register: workstation_code_extensions
   changed_when: false
 
+# The Marketplace answers 503 under load — seen on a fresh machine, in the
+# middle of the list — and that would abort the whole run for a hiccup on
+# Microsoft's side: each extension is retried before giving up.
 - name: Install the Visual Studio Code extensions
   ansible.builtin.command:
     cmd: "code --install-extension {{ item }}"
   loop: "{{ workstation_vscode_extensions }}"
   when: item not in (workstation_code_extensions.stdout_lines | map('lower') | list)
+  register: workstation_code_install
+  until: workstation_code_install.rc == 0
+  retries: 5
+  delay: 10
   changed_when: true
