@@ -27,6 +27,28 @@
     state: present
   become: true
 
+# starship is the prompt ~/.zshrc initialises (home/.config/starship.toml is
+# its configuration). Fedora does not package it, and the COPR is the
+# installation method starship documents for Fedora, the same pattern as mise
+# above. https://starship.rs/guide/
+- name: Enable the starship COPR repository
+  ansible.builtin.yum_repository:
+    name: copr:copr.fedorainfracloud.org:atim:starship
+    description: Copr repo for starship owned by atim
+    baseurl: https://download.copr.fedorainfracloud.org/results/atim/starship/fedora-$releasever-$basearch/
+    gpgkey: https://download.copr.fedorainfracloud.org/results/atim/starship/pubkey.gpg
+    gpgcheck: true
+    repo_gpgcheck: false
+    enabled: true
+    skip_if_unavailable: true
+  become: true
+
+- name: Install starship
+  ansible.builtin.dnf:
+    name: starship
+    state: present
+  become: true
+
 # The dotfiles are only useful if the login shell reads them.
 - name: Use zsh as the login shell
   ansible.builtin.user:

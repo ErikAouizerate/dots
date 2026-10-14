@@ -45,7 +45,7 @@ dots/
 │   ├── inventory.yml           localhost
 │   ├── playbook.yml            the four roles, and the profile switch
 │   └── roles/
-│       ├── base/               CLI packages, mise, zsh/oh-my-zsh as the login shell
+│       ├── base/               CLI packages, mise, starship, zsh/oh-my-zsh, login shell
 │       ├── dotfiles/           the symlinks from home/ into $HOME
 │       ├── workstation/        the Fedora desktop layer (workstation only)
 │       └── user_tools/         mise runtimes, opencode, plugin dependencies
