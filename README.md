@@ -1,0 +1,126 @@
+# dots
+
+Sets up a Fedora machine from scratch: command line tools, zsh, the user's
+configuration files and the MiracleWM desktop, with one command and an Ansible
+playbook.
+
+## Quick start
+
+```sh
+curl -fsSL https://github.com/ErikAouizerate/dots/raw/main/install-fedora.sh | bash
+```
+
+The default profile is `workstation` (graphical desktop). For a command line
+only machine:
+
+```sh
+curl -fsSL https://github.com/ErikAouizerate/dots/raw/main/install-fedora.sh | bash -s -- vps
+```
+
+The script installs `ansible-core` and `git`, clones this repository into
+`~/.dotfiles` and runs the playbook. Re-running it is the update command: the
+playbook is idempotent and converges the machine again.
+
+## How it works
+
+- `home/` mirrors the home directory. The `dotfiles` role walks that tree and
+  symlinks **every** file it finds to the same relative path in `$HOME`, so
+  `home/.config/starship.toml` becomes `~/.config/starship.toml`.
+- A file that this repository does not manage yet (a hand-written `~/.zshrc`,
+  for instance) is moved to `<file>.bak.<YYYYMMDD-HHMM>` before the link is
+  created. Nothing is deleted.
+- Configuration drifts between machines, and that is accepted: editing
+  `~/.zshrc` edits the file in the repository, and the change can be committed
+  from there.
+- Everything else is Ansible: packages, third-party repositories, `dconf`
+  settings, VSCode extensions.
+
+## Layout
+
+```
+dots/
+├── install-fedora.sh           bootstrap: Ansible, checkout, playbook
+├── ansible.cfg
+├── ansible/
+│   ├── inventory.yml           localhost
+│   ├── playbook.yml            the four roles, and the profile switch
+│   └── roles/
+│       ├── base/               CLI packages, mise, zsh as the login shell
+│       ├── dotfiles/           the symlinks from home/ into $HOME
+│       ├── workstation/        the Fedora desktop layer (workstation only)
+│       └── user_tools/         mise runtimes, opencode, plugin dependencies
+└── home/                       mirrors $HOME, symlinked file by file
+    ├── .zshrc
+    ├── .zshenv
+    ├── .gitconfig
+    ├── .config/
+    │   ├── starship.toml       prompt
+    │   ├── mise/config.toml    python, uv, node, yarn, pnpm, rust
+    │   ├── git/hooks/pre-push  secret guardrail, wired by core.hooksPath
+    │   ├── miracle-wm/         compositor keybindings
+    │   ├── miracle-wm.config   Mir configuration
+    │   ├── libinput-gestures.conf
+    │   ├── xdg-terminals.list
+    │   ├── Code/User/          VSCode settings and keybindings
+    │   └── opencode/           agents, skills, local plugin
+    └── .local/
+        ├── bin/                wm-* compositor helpers
+        └── share/applications/ baobab desktop entry
+```
+
+## Profiles
+
+| Profile | What it adds |
+| --- | --- |
+| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, Bitwarden (Flatpak), the Ptyxis `dconf` settings and the VSCode extensions |
+| `vps` | nothing beyond `base`, `dotfiles` and `user_tools` |
+
+The `workstation` profile expects the **Fedora MiracleWM spin** as its base: it
+installs everything around the desktop but not the compositor, DankMaterialShell
+or their session scripts.
+
+miracle-wm and libinput-gestures exec the commands of their bindings without a
+shell, so they expand neither `~` nor `$HOME`, and the compositor's PATH does not
+contain `~/.local/bin`. The `wm-*` helpers are therefore linked into
+`/usr/local/bin` as well and called by their bare name. No configuration file in
+`home/` carries a home path: they all resolve through `~`, `$HOME` or a PATH
+lookup, so a machine where the user is not `riko` works the same.
+
+## Adding a configuration file
+
+Put it in `home/` at the path it should have in `$HOME`. Nothing else to do:
+the next run links it.
+
+Packages and repositories go in `ansible/roles/*/defaults/main.yml`, which is
+also where the VSCode extension list lives.
+
+## Machine-specific settings
+
+`~/.zshrc.local`, sourced by `~/.zshrc` when it exists, is not versioned. That
+is where secrets, extra aliases and tools installed by hand belong.
+
+## Working on the repository
+
+```sh
+shellcheck -x install-fedora.sh home/.local/bin/wm-* home/.config/git/hooks/pre-push
+ansible-lint ansible/
+ansible-playbook ansible/playbook.yml --syntax-check
+```
+
+Run from a checkout, `install-fedora.sh` configures **that** checkout instead of
+cloning into `~/.dotfiles`, and everything after the profile is forwarded to
+`ansible-playbook`, which makes a dry run easy:
+
+```sh
+./install-fedora.sh workstation --check --diff
+./install-fedora.sh workstation --diff --tags dotfiles
+```
+
+## Not managed
+
+- `~/.config/opencode/service.json`, which holds the service password. The
+  tokens referenced as `{env:...}` in `opencode.json` are set per machine with
+  `opencode service set env <NAME> <value>`.
+- VSCode extensions other than the ones listed in the `workstation` role.
+- Flatpaks other than Bitwarden.
+- The first `mise install` downloads the runtimes (around 1 GB).
