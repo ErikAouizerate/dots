@@ -1,0 +1,13 @@
+---
+# Where this repository is checked out. install-fedora.sh overrides this with
+# the directory it actually cloned into, so a checkout that lives elsewhere
+# (a development clone, for instance) links against itself.
+dotfiles_repo_dir: "{{ ansible_facts.env.HOME }}/.dotfiles"
+
+# The tree that mirrors the home directory: every file below it is symlinked
+# to the same relative path in $HOME.
+dotfiles_source_dir: "{{ dotfiles_repo_dir }}/home"
+
+# Suffix of the backups taken before replacing a file that this repository does
+# not manage yet, for example ~/.zshrc.bak.20251014-1501.
+dotfiles_backup_suffix: "{{ ansible_facts.date_time.date | replace('-', '') }}-{{ ansible_facts.date_time.hour }}{{ ansible_facts.date_time.minute }}"

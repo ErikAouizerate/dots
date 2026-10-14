@@ -1,0 +1,17 @@
+---
+# Command line tools that every machine needs, whatever its profile.
+base_packages:
+  - bat
+  - curl
+  - direnv
+  - fd-find
+  - fzf
+  - git
+  - gitleaks
+  - htop
+  - jq
+  - nano
+  - ripgrep
+  - tree
+  - unzip
+  - zsh

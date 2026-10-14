@@ -1,0 +1,71 @@
+---
+# Link every file of the repository's home/ tree into the real home directory,
+# mirroring the layout. Files that this repository does not manage yet are
+# backed up first, with a timestamped suffix.
+
+- name: List the configuration files of the repository
+  ansible.builtin.find:
+    paths: "{{ dotfiles_source_dir }}"
+    file_type: file
+    hidden: true
+    recurse: true
+  register: dotfiles_files
+
+- name: Build the list of links to create
+  ansible.builtin.set_fact:
+    dotfiles_links: >-
+      {{ dotfiles_links | default([]) +
+         [{'src': item,
+           'dest': ansible_facts.env.HOME ~ '/' ~ (item | relpath(dotfiles_source_dir))}] }}
+  loop: "{{ dotfiles_files.files | map(attribute='path') | list }}"
+  loop_control:
+    label: "{{ item | relpath(dotfiles_source_dir) }}"
+
+# ansible.builtin.file does not create the parent directories of a link. The
+# home directory itself is skipped: it always exists, and it must keep the
+# permissions it has. No mode on purpose, for the same reason: existing
+# directories keep theirs, new ones are created with the umask in force.
+- name: Create the directories the links live in # noqa: risky-file-permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+  loop: >-
+    {{ dotfiles_links | default([]) | map(attribute='dest') | map('dirname')
+       | reject('eq', ansible_facts.env.HOME) | unique | list }}
+
+- name: Look for configuration files that are already present
+  ansible.builtin.stat:
+    path: "{{ item.dest }}"
+    follow: false
+  loop: "{{ dotfiles_links | default([]) }}"
+  loop_control:
+    label: "{{ item.dest }}"
+  register: dotfiles_present
+
+- name: Back up the configuration files this repository does not manage yet
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ item.item.dest }}"
+      - "{{ item.item.dest }}.bak.{{ dotfiles_backup_suffix }}"
+  loop: "{{ dotfiles_present.results }}"
+  loop_control:
+    label: "{{ item.item.dest }}"
+  when:
+    - item.stat.exists
+    # lnk_target is the target exactly as it was written, and the links this
+    # role creates are absolute. Comparing lnk_source instead would compare
+    # resolved paths, and would mistake a home directory that is itself a
+    # symlink for a stale link.
+    - not (item.stat.islnk | default(false) and item.stat.lnk_target | default('') == item.item.src)
+  changed_when: true
+
+- name: Link the configuration files into the home directory
+  ansible.builtin.file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+    force: true
+  loop: "{{ dotfiles_links | default([]) }}"
+  loop_control:
+    label: "{{ item.dest }}"
