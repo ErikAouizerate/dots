@@ -1,0 +1,13 @@
+{
+  "name": "opencode-ponytail-local",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "Local OpenCode V2 wrapper around the ponytail V1 plugin",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@dietrichgebert/ponytail": "^4.10.0"
+  }
+}

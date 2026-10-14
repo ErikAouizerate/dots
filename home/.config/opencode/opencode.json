@@ -1,0 +1,52 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/deepseek-v4.1-flash",
+  "plugins": [
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
+  "tool_output": {
+    "max_lines": 300,
+    "max_bytes": 15360
+  },
+  "agents": {
+    "title": {
+      "model": "opencode-go/deepseek-v4.1-flash"
+    },
+    "plan": {
+      "model": "opencode-go/deepseek-v4.1-flash#max",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "build": {
+      "model": "opencode-go/deepseek-v4.1-flash#high"
+    },
+    "explore": {
+      "model": "opencode-go/deepseek-v4.1-flash#low"
+    },
+    "general": {
+      "model": "opencode-go/deepseek-v4.1-flash"
+    }
+  },
+  "mcp": {
+    "servers": {
+      "basic-memory": {
+        "type": "remote",
+        "url": "https://bm.ebag.click/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:BM_TOKEN}"
+        }
+      },
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:CONTEXT7_KEY}"
+        }
+      }
+    }
+  }
+}
