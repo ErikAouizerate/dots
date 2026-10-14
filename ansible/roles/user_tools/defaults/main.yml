@@ -1,0 +1,4 @@
+---
+# Known-good baseline. opencode updates itself afterwards, so bumping this is
+# only needed to move the starting point of a fresh machine.
+user_tools_opencode_version: "2.0.27"
