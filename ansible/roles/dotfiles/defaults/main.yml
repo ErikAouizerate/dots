@@ -2,7 +2,7 @@
 # Where this repository is checked out. install-fedora.sh overrides this with
 # the directory it actually cloned into, so a checkout that lives elsewhere
 # (a development clone, for instance) links against itself.
-dotfiles_repo_dir: "{{ ansible_facts.env.HOME }}/.dotfiles"
+dotfiles_repo_dir: "{{ ansible_facts.env.HOME }}/dots"
 
 # The tree that mirrors the home directory: every file below it is symlinked
 # to the same relative path in $HOME.

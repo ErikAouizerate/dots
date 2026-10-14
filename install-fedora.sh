@@ -11,7 +11,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/ErikAouizerate/dots.git"
-DOTFILES_DIR="$HOME/.dotfiles"
+DOTFILES_DIR="$HOME/dots"
 
 usage() {
   cat <<'EOF'
@@ -27,7 +27,7 @@ machine being tested:
   ./install-fedora.sh workstation --check --diff
 
 Run from a checkout, the script configures that checkout instead of cloning
-the repository into ~/.dotfiles.
+the repository into ~/dots.
 EOF
 }
 

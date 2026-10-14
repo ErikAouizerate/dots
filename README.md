@@ -18,7 +18,7 @@ curl -fsSL https://github.com/ErikAouizerate/dots/raw/main/install-fedora.sh | b
 ```
 
 The script installs `ansible-core` and `git`, clones this repository into
-`~/.dotfiles` and runs the playbook. Re-running it is the update command: the
+`~/dots` and runs the playbook. Re-running it is the update command: the
 playbook is idempotent and converges the machine again.
 
 ## How it works
@@ -118,7 +118,7 @@ ansible-playbook ansible/playbook.yml --syntax-check
 ```
 
 Run from a checkout, `install-fedora.sh` configures **that** checkout instead of
-cloning into `~/.dotfiles`, and everything after the profile is forwarded to
+cloning into `~/dots`, and everything after the profile is forwarded to
 `ansible-playbook`, which makes a dry run easy:
 
 ```sh
