@@ -1,0 +1,244 @@
+---
+# ---------------------------------------------------------------------------
+# Locale
+# ---------------------------------------------------------------------------
+# SDDM builds the session environment from the PAM one (pam_getenvlist) and
+# drops the system locale: /etc/locale.conf alone never reaches the graphical
+# session (GDM reads it itself, SDDM does not), so every process there ran in
+# C — the foot "'C' is not a UTF-8 locale" warning, byte-order sort in shells.
+# pam_env reads /etc/environment in SDDM's auth stack, and the session
+# inherits it.
+- name: Export the locale to graphical sessions (SDDM / pam_env)
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    regexp: '^LANG='
+    line: LANG=en_US.UTF-8
+    create: true
+    mode: "0644"
+  become: true
+
+# ---------------------------------------------------------------------------
+# Third-party repositories
+# ---------------------------------------------------------------------------
+# Fedora ships the google-chrome repo definition (disabled) in this package;
+# we flip it on rather than maintaining our own copy of Google's repo file.
+- name: Install the Fedora third-party repo definitions
+  ansible.builtin.dnf:
+    name: fedora-workstation-repositories
+    state: present
+  become: true
+
+# lineinfile, not ini_file: ini_file left ansible-core for community.general.
+- name: Enable the google-chrome repository
+  ansible.builtin.lineinfile:
+    path: /etc/yum.repos.d/google-chrome.repo
+    regexp: '^enabled\s*='
+    line: enabled=1
+  become: true
+
+- name: Add the Brave repository
+  ansible.builtin.get_url:
+    url: https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+    dest: /etc/yum.repos.d/brave-browser.repo
+    force: true
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Add the Sublime Text repository
+  ansible.builtin.get_url:
+    url: https://download.sublimetext.com/rpm/stable/x86_64/sublime-text.repo
+    dest: /etc/yum.repos.d/sublime-text.repo
+    force: true
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Add the Visual Studio Code repository (Microsoft)
+  ansible.builtin.yum_repository:
+    name: code
+    description: Visual Studio Code
+    baseurl: https://packages.microsoft.com/yumrepos/vscode
+    gpgkey: https://packages.microsoft.com/keys/microsoft.asc
+    gpgcheck: true
+    repo_gpgcheck: false
+    enabled: true
+  become: true
+
+# The Ansible dnf module fails the transaction on an unverifiable
+# @commandline package ("The repository does not have any OpenPGP keys
+# configured") where the dnf CLI only warns, so the keys are imported
+# explicitly rather than left to the first install.
+- name: Import the Microsoft signing key
+  ansible.builtin.rpm_key:
+    key: https://packages.microsoft.com/keys/microsoft.asc
+    state: present
+  become: true
+
+# RPM Fusion carries VLC. The *-release packages carry the repo definitions
+# and the GPG keys, so install those instead of fetching .repo files by hand;
+# the version is templated on the Fedora major release.
+#
+# The signing keys ship in distribution-gpg-keys, Fedora-signed and pulled in
+# by fedora-workstation-repositories above: nothing fetched from RPM Fusion by
+# hand.
+- name: Import the RPM Fusion signing keys
+  ansible.builtin.rpm_key:
+    key: "/usr/share/distribution-gpg-keys/rpmfusion/RPM-GPG-KEY-rpmfusion-{{ item }}-fedora-{{ ansible_facts.distribution_major_version }}"
+    state: present
+  loop:
+    - free
+    - nonfree
+  become: true
+
+- name: Install the RPM Fusion release repositories
+  ansible.builtin.dnf:
+    name:
+      - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
+      - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_facts.distribution_major_version }}.noarch.rpm"
+    state: present
+  become: true
+
+# Fedora retired the package, so the 3-finger workspace swipes come from this
+# COPR. https://copr.fedorainfracloud.org/coprs/atim/libinput-gestures/
+- name: Enable the libinput-gestures COPR repository
+  ansible.builtin.yum_repository:
+    name: copr:copr.fedorainfracloud.org:atim:libinput-gestures
+    description: Copr repo for libinput-gestures owned by atim
+    baseurl: https://download.copr.fedorainfracloud.org/results/atim/libinput-gestures/fedora-$releasever-$basearch/
+    gpgkey: https://download.copr.fedorainfracloud.org/results/atim/libinput-gestures/pubkey.gpg
+    gpgcheck: true
+    repo_gpgcheck: false
+    enabled: true
+    skip_if_unavailable: true
+  become: true
+
+# Ptyxis is configured to use FiraCode Nerd Font, which Fedora does not
+# package. https://copr.fedorainfracloud.org/coprs/aquacash5/nerd-fonts/
+- name: Enable the nerd-fonts COPR repository
+  ansible.builtin.yum_repository:
+    name: copr:copr.fedorainfracloud.org:aquacash5:nerd-fonts
+    description: Copr repo for nerd-fonts owned by aquacash5
+    baseurl: https://download.copr.fedorainfracloud.org/results/aquacash5/nerd-fonts/fedora-$releasever-$basearch/
+    gpgkey: https://download.copr.fedorainfracloud.org/results/aquacash5/nerd-fonts/pubkey.gpg
+    gpgcheck: true
+    repo_gpgcheck: false
+    enabled: true
+    skip_if_unavailable: true
+  become: true
+
+# ---------------------------------------------------------------------------
+# Packages
+# ---------------------------------------------------------------------------
+- name: Install the workstation packages
+  ansible.builtin.dnf:
+    name: "{{ workstation_packages }}"
+    state: present
+  become: true
+
+# libinput-gestures reads /dev/input.
+- name: Allow the user to read input devices (libinput-gestures)
+  ansible.builtin.user:
+    name: "{{ ansible_facts.user_id }}"
+    groups: input
+    append: true
+  become: true
+
+# The dotfiles role put the helpers in ~/.local/bin, which is on the PATH of an
+# interactive shell but not on the compositor's. See workstation_wm_helpers.
+- name: Link the compositor helpers into /usr/local/bin
+  ansible.builtin.file:
+    src: "{{ ansible_facts.env.HOME }}/.local/bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+    force: true
+  loop: "{{ workstation_wm_helpers }}"
+  become: true
+
+# ---------------------------------------------------------------------------
+# Brave
+# ---------------------------------------------------------------------------
+# The owner's three extensions, pushed as managed policy so a fresh machine
+# gets them without touching the store. Brave reads JSON policy files from
+# /etc/brave/policies/managed (support.brave.com "Group Policy"; the Chrome
+# path /etc/opt/chrome/policies/managed does not apply to Brave).
+# ExtensionInstallForcelist entries are "<id>;<update-url>", the update URL
+# being the Chrome Web Store service (clients2.google.com/service/update2/crx):
+# Brave installs extensions from the CWS, the same convention as Bitwarden's
+# official deployment doc.
+# IDs (Chrome Web Store): Bitwarden nngceckbapebfimnlniiiahkandclblb,
+# Proton VPN jplgfhpmjnbigmhklmmbgecoobifkmpa, Wappalyzer
+# gppongmhjkpfnbhagpmjfkannfbllamg.
+# forcelist = force-installed: the user cannot uninstall them (deliberate
+# admin choice); Brave picks them up on its next launch.
+- name: Create the Brave managed-policy directory
+  ansible.builtin.file:
+    path: /etc/brave/policies/managed
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+# ansible.builtin.copy does not create the parent of its destination, hence
+# the task above.
+- name: Force-install the Brave extensions
+  ansible.builtin.copy:
+    dest: /etc/brave/policies/managed/extensions.json
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {
+        "ExtensionInstallForcelist": [
+          "nngceckbapebfimnlniiiahkandclblb;https://clients2.google.com/service/update2/crx",
+          "jplgfhpmjnbigmhklmmbgecoobifkmpa;https://clients2.google.com/service/update2/crx",
+          "gppongmhjkpfnbhagpmjfkannfbllamg;https://clients2.google.com/service/update2/crx"
+        ]
+      }
+  become: true
+
+# ---------------------------------------------------------------------------
+# Flatpak
+# ---------------------------------------------------------------------------
+# --user: no polkit prompt, and no need for a session bus, so the role works
+# from a console and over SSH too.
+- name: Add the Flathub remote
+  ansible.builtin.command:
+    cmd: flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+  changed_when: false
+
+- name: Install Bitwarden
+  ansible.builtin.command:
+    cmd: flatpak install --user --assumeyes --noninteractive flathub com.bitwarden.desktop
+  changed_when: false
+
+# ---------------------------------------------------------------------------
+# dconf: Ptyxis
+# ---------------------------------------------------------------------------
+# dconf talks to the session bus, so this is skipped when the playbook runs
+# outside a graphical session; re-running it from a session applies the
+# settings.
+- name: Load the Ptyxis settings into dconf
+  ansible.builtin.shell:
+    cmd: "dconf load /org/gnome/Ptyxis/ < {{ role_path }}/files/ptyxis.dconf"
+  when: ansible_facts.env.DBUS_SESSION_BUS_ADDRESS is defined
+  changed_when: false
+
+# ---------------------------------------------------------------------------
+# Visual Studio Code
+# ---------------------------------------------------------------------------
+- name: List the installed Visual Studio Code extensions
+  ansible.builtin.command:
+    cmd: code --list-extensions
+  register: workstation_code_extensions
+  changed_when: false
+
+- name: Install the Visual Studio Code extensions
+  ansible.builtin.command:
+    cmd: "code --install-extension {{ item }}"
+  loop: "{{ workstation_vscode_extensions }}"
+  when: item not in (workstation_code_extensions.stdout_lines | map('lower') | list)
+  changed_when: true

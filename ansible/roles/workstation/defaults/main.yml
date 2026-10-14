@@ -1,0 +1,44 @@
+---
+# The Fedora desktop surface. Most of these packages are not in Fedora's own
+# repositories: the repositories that provide them are set up by this role.
+workstation_packages:
+  # Fedora
+  - baobab
+  - flatpak
+  - grim
+  - ptyxis
+  - slurp
+  - wl-clipboard
+  - wtype
+  # RPM Fusion
+  - vlc
+  - vlc-plugins-freeworld
+  # Brave, Sublime and Google repositories
+  - brave-browser
+  - google-chrome-stable
+  - sublime-text
+  # Microsoft's Visual Studio Code repository
+  - code
+  # COPRs enabled by this role
+  - fira-code-nerd-fonts
+  - libinput-gestures
+
+# The official language extensions only: TypeScript and CSS ride VSCode's
+# built-in support, everything else is one extension per language.
+workstation_vscode_extensions:
+  - docker.docker
+  - golang.go
+  - ms-python.python
+  - ms-python.vscode-pylance
+  - redhat.vscode-yaml
+  - stylelint.vscode-stylelint
+
+# Compositor helpers, linked from ~/.local/bin into /usr/local/bin.
+# miracle-wm and libinput-gestures exec the commands of their bindings without
+# a shell and without expanding "~", so the bare name has to resolve on the
+# session's PATH, which /usr/local/bin always does.
+workstation_wm_helpers:
+  - wm-focus-cycle
+  - wm-move-window-to-workspace
+  - wm-screenshot
+  - wm-workspace

@@ -1,0 +1,12 @@
+[org/gnome/Ptyxis]
+audible-bell=false
+default-profile-uuid='f88741913649cc36967f2ee4696113e5'
+font-name='FiraCode Nerd Font 10'
+profile-uuids=['f88741913649cc36967f2ee4696113e5']
+use-system-font=false
+visual-bell=false
+
+[org/gnome/Ptyxis/Profiles/f88741913649cc36967f2ee4696113e5]
+login-shell=false
+palette='nord'
+preserve-directory='safe'
