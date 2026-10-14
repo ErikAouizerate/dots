@@ -228,6 +228,95 @@
   changed_when: false
 
 # ---------------------------------------------------------------------------
+# DankMaterialShell (bar, dock, clipboard history)
+# ---------------------------------------------------------------------------
+# The spin ships DMS with its own defaults, and DMS owns its settings files:
+# it rewrites them as the shell is used. They are therefore not symlinked from
+# home/ (the dotfiles role and the shell would fight over the same file), but
+# patched here, leaving the keys DMS manages alone. DMS watches settings.json
+# and reloads it, so the layout applies live, without a relogin. Re-running the
+# playbook is how it is re-applied once DMS has written its own values back.
+- name: Look for the DankMaterialShell settings
+  ansible.builtin.stat:
+    path: "{{ ansible_facts.env.HOME }}/.config/DankMaterialShell/settings.json"
+  register: workstation_dms_settings
+
+# A machine whose session has never started has no settings.json yet: DMS
+# writes it on its first launch. Skipping beats writing a partial file whose
+# merge with DMS's own defaults is unverified.
+- name: Warn that the DankMaterialShell layout waits for the first session
+  ansible.builtin.debug:
+    msg: >-
+      No ~/.config/DankMaterialShell/settings.json yet: DMS writes it when the
+      desktop session first starts. Open the session once, then re-run the
+      playbook to apply the bar and dock layout.
+  when: not workstation_dms_settings.stat.exists
+
+# cmp: DMS keeps the file in memory and writes it back whole, so the patch has
+# to be compared before being written, or every run would report a change.
+- name: Patch the DankMaterialShell settings (dock, bar, clock)
+  ansible.builtin.shell:
+    cmd: |
+      settings="$HOME/.config/DankMaterialShell/settings.json"
+      tmp=$(mktemp "$settings.XXXXXX")
+      if ! jq -f "{{ role_path }}/files/dms-settings.jq" "$settings" > "$tmp"; then
+        rm -f "$tmp"
+        echo "dms: jq failed, settings.json left untouched" >&2
+        exit 1
+      fi
+      if cmp -s "$settings" "$tmp"; then
+        rm -f "$tmp"
+        exit 0
+      fi
+      if chmod --reference="$settings" "$tmp" && mv -- "$tmp" "$settings"; then
+        echo patched
+      else
+        rm -f "$tmp"
+        echo "dms: settings.json left untouched" >&2
+        exit 1
+      fi
+  register: workstation_dms_settings_patched
+  changed_when: "'patched' in workstation_dms_settings_patched.stdout"
+  when: workstation_dms_settings.stat.exists
+
+# The clipboard history lives in a second file DMS creates lazily
+# (clsettings.json, not settings.json) and that its clipboard server also
+# writes, so it gets the same treatment: the 500 entries the owner asked for,
+# the file created when DMS has not yet, and never a key dropped. DMS's own
+# `maxHistory` choices run from 25 to 100000, and its server reads the file
+# once at startup: a session picks it up after a relogin (or a DMS restart).
+- name: Pin the DankMaterialShell clipboard history to 500 entries
+  ansible.builtin.shell:
+    cmd: |
+      settings="$HOME/.config/DankMaterialShell/clsettings.json"
+      mkdir -p "$(dirname "$settings")"
+      if [ ! -f "$settings" ]; then
+        printf '{\n  "maxHistory": 500\n}\n' > "$settings"
+        chmod 0644 "$settings"
+        echo patched
+        exit 0
+      fi
+      tmp=$(mktemp "$settings.XXXXXX")
+      if ! jq '.maxHistory = 500' "$settings" > "$tmp"; then
+        rm -f "$tmp"
+        echo "dms: jq failed, clsettings.json left untouched" >&2
+        exit 1
+      fi
+      if cmp -s "$settings" "$tmp"; then
+        rm -f "$tmp"
+        exit 0
+      fi
+      if chmod --reference="$settings" "$tmp" && mv -- "$tmp" "$settings"; then
+        echo patched
+      else
+        rm -f "$tmp"
+        echo "dms: clsettings.json left untouched" >&2
+        exit 1
+      fi
+  register: workstation_dms_clipboard
+  changed_when: "'patched' in workstation_dms_clipboard.stdout"
+
+# ---------------------------------------------------------------------------
 # Visual Studio Code
 # ---------------------------------------------------------------------------
 - name: List the installed Visual Studio Code extensions

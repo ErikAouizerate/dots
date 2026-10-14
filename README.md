@@ -45,7 +45,7 @@ dots/
 │   ├── inventory.yml           localhost
 │   ├── playbook.yml            the four roles, and the profile switch
 │   └── roles/
-│       ├── base/               CLI packages, mise, zsh as the login shell
+│       ├── base/               CLI packages, mise, zsh/oh-my-zsh as the login shell
 │       ├── dotfiles/           the symlinks from home/ into $HOME
 │       ├── workstation/        the Fedora desktop layer (workstation only)
 │       └── user_tools/         mise runtimes, opencode, plugin dependencies
@@ -72,12 +72,22 @@ dots/
 
 | Profile | What it adds |
 | --- | --- |
-| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, Bitwarden (Flatpak), the Ptyxis `dconf` settings and the VSCode extensions |
+| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, Bitwarden (Flatpak), the Ptyxis `dconf` settings, the DankMaterialShell layout and the VSCode extensions |
 | `vps` | nothing beyond `base`, `dotfiles` and `user_tools` |
 
 The `workstation` profile expects the **Fedora MiracleWM spin** as its base: it
 installs everything around the desktop but not the compositor, DankMaterialShell
-or their session scripts.
+or their session scripts. The spin's shell therefore keeps its own look unless
+the role patches it: `~/.config/DankMaterialShell/settings.json` is DMS's file,
+rewritten by the shell as it is used, so it is not symlinked from `home/` but
+adjusted with `jq` on every run (`files/dms-settings.jq`): dock off, bar glued
+to the screen edges, numbered workspaces, window title in the centre, disk usage
+next to memory, 24-hour clock with a short date at the far right. DMS watches
+that file and reloads it, so the layout applies without a relogin, and re-running
+the playbook is how it is re-applied. The same goes for the clipboard history
+(`clsettings.json`, 500 entries). A machine whose session has not started yet
+has no `settings.json`: the run says so and skips, and the playbook can be run
+again from the session.
 
 miracle-wm and libinput-gestures exec the commands of their bindings without a
 shell, so they expand neither `~` nor `$HOME`, and the compositor's PATH does not

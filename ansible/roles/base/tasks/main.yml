@@ -33,3 +33,16 @@
     name: "{{ ansible_facts.user_id }}"
     shell: /usr/bin/zsh
   become: true
+
+# ~/.zshrc sources $HOME/.oh-my-zsh/oh-my-zsh.sh, and Fedora packages neither
+# the framework nor its theme, so it is cloned the way its own installer does
+# it. Shallow, and never updated afterwards: update: false keeps the run
+# idempotent, and the framework is configuration rather than a package to
+# track. version pins the branch that clone starts from.
+- name: Install oh-my-zsh
+  ansible.builtin.git:
+    repo: https://github.com/ohmyzsh/ohmyzsh.git
+    dest: "{{ ansible_facts.env.HOME }}/.oh-my-zsh"
+    version: master
+    depth: 1
+    update: false
