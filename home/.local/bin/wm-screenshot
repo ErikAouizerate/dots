@@ -1,0 +1,4 @@
+#!/bin/sh
+# wm-screenshot — interactive region screenshot to the clipboard
+# (the flameshot-gui habit, ported to wayland-native tools).
+grim -g "$(slurp)" - | wl-copy

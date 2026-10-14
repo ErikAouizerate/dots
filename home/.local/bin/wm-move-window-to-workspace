@@ -1,0 +1,25 @@
+#!/bin/sh
+# wm-move-window-to-workspace N — move the focused window to workspace N and
+# keep the view where it was (sway's `move container to workspace N`).
+# miracle-wm 0.8.x's built-in move-to-workspace always activates the target
+# workspace (CommandController::try_move_to_workspace, src/command_controller.cpp),
+# so: remember the current workspace number, move, then select it again. If the
+# source was emptied it has been deleted and this recreates it, like sway keeps
+# a named empty workspace. Usage: wm-move-window-to-workspace N
+set -eu
+
+[ -n "${1:-}" ] || exit 2
+
+cur=$(miraclemsg -r -t get_workspaces | jq -r '.[] | select(.focused) | .num' || true)
+
+miraclemsg "move container to workspace $1"
+
+# The `--no-auto-back-and-forth` option must precede its argument: the IPC
+# parser stops recognising options after the first argument (IpcCommandParser,
+# src/ipc_command.cpp), so `workspace N --no-auto-back-and-forth` would read the
+# flag as the workspace name.
+# Non-numeric / absent (named workspace): leave the view where it is.
+case "$cur" in
+  ''|*[!0-9]*) ;;
+  *) miraclemsg "workspace --no-auto-back-and-forth $cur" ;;
+esac

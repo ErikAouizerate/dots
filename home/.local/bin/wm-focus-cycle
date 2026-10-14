@@ -1,0 +1,33 @@
+#!/bin/sh
+# wm-focus-cycle — cycle focus through the windows of the focused workspace in
+# reading order, wrapping at both ends. miracle-wm 0.8.x `miraclemsg focus
+# next|prev` only walks the focused leaf's immediate parent group and stops at
+# its ends (CommandController::try_select_next/prev, src/command_controller.cpp),
+# so Super+Tab dies at the first/last window of a row. This queries the window
+# tree and focuses the next/previous leaf by con_id: it crosses rows and wraps.
+# Usage: wm-focus-cycle next|prev
+set -eu
+
+dir=${1:-next}
+
+# shellcheck disable=SC2016  # $ in the single-quoted jq program is jq's
+id=$(miraclemsg -t get_tree -r | jq -r --arg dir "$dir" '
+  def leaves:
+    if (.type == "con" and (.window != null)) then [.]
+    else [ (.nodes // [])[] | leaves[] ]
+    end;
+  ([ .nodes[].nodes[] | select(.type == "workspace" and .focused == true) ] | .[0]) as $w
+  | ($w | leaves) as $ws
+  | ($ws | map(.focused == true) | index(true)) as $i
+  | if ($ws | length) == 0 then empty
+    else
+      (if $i == null then 0
+       elif $dir == "prev" then (($i - 1 + ($ws | length)) % ($ws | length))
+       else (($i + 1) % ($ws | length))
+       end) as $n
+      | $ws[$n].id
+    end
+')
+if [ -n "$id" ]; then
+    miraclemsg "focus [con_id=$id]"
+fi

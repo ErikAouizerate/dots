@@ -1,0 +1,272 @@
+# MiracleWM port of the workstation sway config (dots, 2026-10-12).
+#
+# Written against the Fedora MiracleWM spin's miracle-wm v0.8.x schema:
+# keys are libevdev input codes (physical key positions, not symbols), so the
+# AZERTY habits carry over as a -> KEY_Q, z -> KEY_W, q -> KEY_A, w -> KEY_Z,
+# and the number row is KEY_1..KEY_0.
+#
+# Bindings that come for free from the built-in defaults (no overrides here):
+#   Super+Enter terminal, Super+v/h vertical/horizontal split, Super+r resize
+#   mode + arrows, Super+arrows focus, Super+Shift+arrows move, workspaces
+#   1..9 + 0 on the number row, Super+s stacking, Super+f fullscreen,
+#   Super+Shift+Space floating, Super+Shift+e quit (remapped below). The
+#   built-in Super+z tabbing is shadowed by the group-layout binding below (the
+#   built-in one has no visible effect in 0.8.x). The built-in Super+Shift+1..0
+#   (move window to workspace) is overridden below: it always follows the
+#   window, the helper leaves the view put.
+
+# Terminal for the built-in Super+Enter binding (the default `terminal`
+# action): the owner's ptyxis, installed by the Ansible workstation role.
+# Two things this line has to get right, both checked against miracle-wm 0.8.3:
+#   1. ptyxis is single-instance by default. A bare `ptyxis` is activated in
+#      the running instance, which re-uses its one window — "only ONE window
+#      can be opened". `--standalone` starts a fresh instance every time, and
+#      is exactly what the owner's sway has (`set $term ptyxis --standalone`).
+#   2. arguments are allowed in this value. The parser validates it by running
+#      `command -v <whole value>` through a shell (config lib program_exists;
+#      it succeeds when the first word resolves, trailing args and all), and
+#      the launcher then splits the value into argv
+#      (ExternalClientLauncher::split_command, quote-aware, no shell), so
+#      `ptyxis --standalone` execs exactly that — no wrapper needed.
+# The sensible-terminal fallback chain knows neither foot nor ptyxis, so the
+# explicit value stays.
+#
+# Nothing here goes through a shell: miracle-wm validates a command with
+# `command -v` (config lib program_exists, which does run a shell) but Mir
+# then splits the value into argv itself (ExternalClientLauncher::split_command)
+# and execs it with posix_spawnp, without expanding "~" or "$HOME". A binding
+# can therefore only call something by a name the compositor resolves on its
+# PATH, and a leading "~/.local/bin/" would be exec'd as a path relative to the
+# working directory and fail. The wm-* helpers are consequently called by their
+# bare name: the Ansible workstation role links ~/.local/bin/wm-* into
+# /usr/local/bin, which every session has on its PATH.
+terminal: ptyxis --standalone
+
+# Flush tiling (2026-10-12, owner): no gap between windows and none at the
+# screen edge. Both are the miracle-wm default of 10 (the inner_gaps/outer_gaps
+# entries in miracle-wm-config.h), so they must be written out to take effect.
+# Windows still start below the DMS bar: the bar's layer-shell exclusive zone
+# shrinks the application area by its own height, this is not outer_gaps' job.
+inner_gaps:
+  x: 0
+  y: 0
+outer_gaps:
+  x: 0
+  y: 0
+resize_jump: 60
+
+# Window animations off (2026-10-12, owner): the shipped defaults (open 0.2s,
+# move 0.15s, close 0.15s, workspace slide 0.22s) read as lag. The per-event
+# `animations` list stays unused; add short entries there if one should come
+# back.
+enable_animations: false
+
+# miracle-wm 0.8.3 reads a hex border colour as 0xRRGGBBAA — alpha LAST: the
+# config lib parses and packs colours as r<<24 | g<<16 | b<<8 | a
+# (try_parse_color / to_hex in miracle-wm-config.cpp), so the last byte is the
+# alpha. The spin's own default proves it: `color: 0x00ffff99` is cyan
+# (0xff,0xff) at alpha 0x99. The previous 0xFF3B4252/0xFF5E81AC here put the
+# intended opaque alpha FIRST, so the compositor read #FF3B42 (red) at 32%
+# opacity and #FF5E81 (pink) at 68% — the faint translucent "purple line +
+# shadow" the owner saw around every window. Written correctly now:
+#   color       0x00000000 = fully transparent: no outline on inactive windows
+#               at all (sway's smart_borders);
+#   focus_color 0x88C0D0FF = Nord frost, one opaque, higher-contrast outline on
+#               the focused window only. 0x5E81ACFF is the host's exact
+#               #5e81ac accent, 0x3B4252FF its focused_inactive, if wanted.
+# size 1 (2026-10-12, owner, bench round 3): the outline is the only focus
+# indicator 0.8.3 has, but this version reserves it *inside* each tile —
+# get_visible_area() insets the window content by `size` on every side
+# (leaf_container.cpp) and the renderer draws the outline in the band it
+# leaves behind, so the band always shows as a separation: at size 2 with
+# inner_gaps 0 the owner still saw 4px of backdrop between two windows (2+2)
+# and 2px along the screen edges. Size 1 keeps a thin (1px) focus outline at
+# 2px total separation; size 0 would be perfectly flush but drop the focus cue
+# entirely. Later miracle-wm versions draw the outline without eating the
+# content (get_visible_area no longer insets, renderer.cpp draws the border
+# around the full surface): raise the size again when the session ships one.
+# radius 0 (2026-10-12, owner): square the outline and the window content.
+# 0.8.3 defaults radius to 8 (read_border, miracle-wm-config.cpp) and rounds
+# the content by max(radius - size, 0) (renderer.cpp), so the spin shipped
+# visibly rounded window corners; 0 removes them.
+border:
+  size: 1
+  radius: 0
+  color: 0x00000000
+  focus_color: 0x88C0D0FF
+
+touchpad:
+  disable_while_typing: true
+  tap_to_click: true
+  acceleration_bias: 0.1
+  vscroll_speed: 0.5
+  hscroll_speed: 0.5
+  click_mode: finger_count
+  scroll_mode: two_finger_scroll
+
+keyboard:
+  keymap:
+    language: fr
+
+default_action_overrides:
+  # Super+a — close window (sway: kill); AZERTY a is the QWERTY-Q key
+  - name: quit_active_window
+    action: down
+    modifiers: [primary]
+    key: KEY_Q
+
+custom_actions:
+  # Super+Space — launcher (sway: rofi; the spin's DMS spotlight)
+  - command: dms ipc call spotlight toggle
+    action: down
+    modifiers: [primary]
+    key: KEY_SPACE
+  # Super+Shift+Enter — browser (sway: brave-browser)
+  - command: brave-browser
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_ENTER
+  # Super+Escape / Super+Shift+E — power menu (sway: wlogout; spin default)
+  - command: dms ipc call powermenu toggle
+    action: down
+    modifiers: [primary]
+    key: KEY_ESC
+  - command: dms ipc call powermenu toggle
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_E
+  # power key — power menu (sway: XF86PowerOff -> wlogout)
+  - command: dms ipc call powermenu toggle
+    action: down
+    modifiers: []
+    key: KEY_POWER
+  # Super+l — lock (sway: swaylock)
+  - command: dms ipc call lock lock
+    action: down
+    modifiers: [primary]
+    key: KEY_L
+  # Super+x — clipboard history (sway: clipman pick). DMS's clipboard history
+  # is the only one that can work on this compositor: clipman, cliphist and
+  # `wl-paste --watch` all speak wlr-data-control, which Mir does not implement
+  # (only ext-data-control), and DMS is an ext-data-control client. It needs
+  # that protocol enabled — the `miracle-wm.config` entry in this repository's
+  # home/.config/miracle-wm.config does exactly that; without it the server never advertises its "clipboard"
+  # capability and this modal opens empty. The IPC target/verb below is the
+  # shell's own (DMSShellIPC.qml, target "clipboard").
+  - command: dms ipc call clipboard open
+    action: down
+    modifiers: [primary]
+    key: KEY_X
+  # Print — region screenshot to clipboard (sway: flameshot gui)
+  - command: wm-screenshot
+    action: down
+    modifiers: []
+    key: KEY_SYSRQ
+  # Super+Shift+c — reload config (sway: reload)
+  - command: miraclemsg reload
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_C
+  # Super+Tab / Super+Shift+Tab — focus cycle (sway: focus right/left).
+  # `miraclemsg focus next|prev` only walks the focused leaf's immediate parent
+  # group and stops at its ends (CommandController::try_select_next/prev,
+  # src/command_controller.cpp), so it dies at the first/last window of a row.
+  # The helper queries the window tree and focuses the next/previous leaf by
+  # con_id: it crosses rows and wraps.
+  - command: wm-focus-cycle next
+    action: down
+    modifiers: [primary]
+    key: KEY_TAB
+  - command: wm-focus-cycle prev
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_TAB
+  # Super+Shift+1..9 / 0 — move the focused window to that workspace without
+  # following it (sway: move container to workspace N). The built-in mapping
+  # always activates the target (CommandController::try_move_to_workspace,
+  # src/command_controller.cpp); the helper moves the window, then re-selects
+  # the workspace it left. Numbers match the built-in mapping exactly
+  # (KEY_1..KEY_9 -> 1..9, KEY_0 -> 0). Custom actions run before the built-in
+  # defaults (Policy::handle_keyboard_event, src/policy.cpp:240).
+  - command: wm-move-window-to-workspace 1
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_1
+  - command: wm-move-window-to-workspace 2
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_2
+  - command: wm-move-window-to-workspace 3
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_3
+  - command: wm-move-window-to-workspace 4
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_4
+  - command: wm-move-window-to-workspace 5
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_5
+  - command: wm-move-window-to-workspace 6
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_6
+  - command: wm-move-window-to-workspace 7
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_7
+  - command: wm-move-window-to-workspace 8
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_8
+  - command: wm-move-window-to-workspace 9
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_9
+  - command: wm-move-window-to-workspace 0
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_0
+  # Super+z / Super+e — group layout (sway: layout tabbed / toggle split).
+  # 0.8.x wart: `layout` from a leaf only wraps that leaf in a new single-child
+  # group, so nothing moves on screen. Aim it at the parent group instead, then
+  # give the window back its keyboard focus (`focus parent` clears it).
+  # No space before `;`: the IPC parser only chains on `token;token` (a lone
+  # `;` becomes an argument — checked against the 0.8.3 parser).
+  # AZERTY z = KEY_W, e = KEY_E.
+  - command: miraclemsg focus parent;layout tabbed;focus tiling
+    action: down
+    modifiers: [primary]
+    key: KEY_W
+  - command: miraclemsg focus parent;layout toggle splitv splith;focus tiling
+    action: down
+    modifiers: [primary]
+    key: KEY_E
+  # Super+Shift+n / Super+n — scratchpad (sway: move/show scratchpad)
+  - command: miraclemsg move scratchpad
+    action: down
+    modifiers: [primary, shift]
+    key: KEY_N
+  - command: miraclemsg scratchpad show
+    action: down
+    modifiers: [primary]
+    key: KEY_N
+  # Super+Ctrl+Shift+Left/Right — move window to the other output
+  - command: miraclemsg move container to output left
+    action: down
+    modifiers: [primary, ctrl, shift]
+    key: KEY_LEFT
+  - command: miraclemsg move container to output right
+    action: down
+    modifiers: [primary, ctrl, shift]
+    key: KEY_RIGHT
+
+startup_apps:
+  # DMS shell (bar, notifications, lock) — kept from the spin's shipped config
+  - command: /usr/libexec/miracle-wm-dms-session
+    restart_on_death: true
+  # 3-finger workspace swipes (Fedora retired the package: it comes from the
+  # atim/libinput-gestures COPR, see the Ansible workstation role)
+  - command: libinput-gestures
+    restart_on_death: true

@@ -1,0 +1,8 @@
+#!/bin/sh
+# wm-workspace — workspace next/prev for whichever compositor is in session:
+# miracle-wm, or sway where present. Used by libinput-gestures (3-finger
+# swipes).
+if [ -n "${MIRACLESOCK:-}" ]; then
+    exec miraclemsg workspace "$@"
+fi
+exec swaymsg workspace "$@"
