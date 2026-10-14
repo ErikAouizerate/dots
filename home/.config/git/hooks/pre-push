@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# pre-push secret guardrail (secrets-only).
+# Blocks outgoing commits that introduce a secret leak or a sensitive file name.
+# Symlinked into ~/.config/git/hooks by the dotfiles role of this repository
+# (core.hooksPath, see home/.gitconfig); this file is the source of truth.
+# Guardrail, not a boundary: bypass with SKIP_SECURITY=1 or `git push --no-verify`.
+set -uo pipefail
+
+# Make sure a user-local gitleaks is found regardless of the push environment.
+# ~/.local/bin still wins (manual installs); gitleaks is a Fedora package and
+# lands in /usr/bin.
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:$PATH"
+
+if [ "${SKIP_SECURITY:-}" = "1" ]; then
+  echo "!! pre-push secret guardrail BYPASSED (SKIP_SECURITY=1)" >&2
+  exit 0
+fi
+
+ZERO=0000000000000000000000000000000000000000
+LOCAL_OIDS=()
+
+while read -r _ local_oid _ _; do
+  [ -z "${local_oid:-}" ] && continue
+  [ "$local_oid" = "$ZERO" ] && continue
+  LOCAL_OIDS+=("$local_oid")
+done
+
+if [ "${#LOCAL_OIDS[@]}" -eq 0 ]; then exit 0; fi
+
+REVS=("${LOCAL_OIDS[@]}" --not --remotes)
+mapfile -t FILES < <(git log --name-only --pretty=format: "${REVS[@]}" | sed '/^[[:space:]]*$/d' | sort -u)
+
+# 1. sensitive file names
+DENY_RE='(^|/)\.env($|\.)|\.(pem|key|p12|pfx)$|(^|/)id_(rsa|ed25519|ecdsa|dsa)$|(^|/)credentials[^/]*$|(^|/)secrets/|\.tfstate$'
+for f in "${FILES[@]}"; do
+  # Safe to publish: .env templates (.env.example, .env.<scope>.example) and
+  # frontend dev defaults (.env.development), which carry no secrets. Content is
+  # still scanned by gitleaks below, so a real secret in those files is caught.
+  case "$(basename "$f")" in
+    .env.example|.env.*.example|.env.development) continue ;;
+  esac
+  if printf '%s' "$f" | grep -Eq "$DENY_RE"; then
+    echo "BLOCKED: sensitive file in outgoing commits: $f" >&2
+    exit 1
+  fi
+done
+
+# 2. secret leaks. gitleaks --exit-code 2 separates leaks (2) from tool errors
+#    (anything else). A missing or failing scanner is a hard failure: the
+#    guardrail must never fail open, otherwise a broken toolchain would silently
+#    let secrets through. Bypass explicitly with SKIP_SECURITY=1.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "BLOCKED: gitleaks not found - cannot scan outgoing commits for secrets (install gitleaks, or bypass with SKIP_SECURITY=1)" >&2
+  exit 1
+fi
+
+GL_OUT="$(gitleaks git -v --no-banner --redact --exit-code 2 --log-opts="${LOCAL_OIDS[*]} --not --remotes" . 2>&1)"; GL_RC=$?
+if [ "$GL_RC" -eq 2 ]; then
+  printf '%s\n' "$GL_OUT" >&2
+  echo "BLOCKED: gitleaks found secrets in outgoing commits." >&2
+  exit 1
+elif [ "$GL_RC" -ne 0 ]; then
+  printf '%s\n' "$GL_OUT" >&2
+  echo "BLOCKED: gitleaks failed (rc=$GL_RC) - cannot scan outgoing commits for secrets (bypass with SKIP_SECURITY=1)" >&2
+  exit 1
+fi
+
+echo "pre-push secret guardrail: OK" >&2
+exit 0

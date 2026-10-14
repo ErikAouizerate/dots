@@ -1,0 +1,8 @@
+[user]
+	name = Erik Aouizerate
+	email = erik123.contact@protonmail.com
+[core]
+	editor = nano
+	hooksPath = ~/.config/git/hooks
+[init]
+	defaultBranch = main
