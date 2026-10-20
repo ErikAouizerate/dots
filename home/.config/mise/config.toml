@@ -15,3 +15,6 @@ node = "24"
 yarn = "latest"
 pnpm = "latest"
 rust = "stable"
+# Fedora does not package ouch (https://github.com/ouch-org/ouch), so it comes
+# from its GitHub release, like the tools the distribution does not ship.
+"github:ouch-org/ouch" = "latest"

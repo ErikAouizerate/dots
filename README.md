@@ -60,7 +60,7 @@ dots/
 │   ├── .zshenv
 │   ├── .gitconfig
 │   └── .config/
-│       ├── mise/config.toml    python, uv, node, yarn, pnpm, rust
+│       ├── mise/config.toml    python, uv, node, yarn, pnpm, rust, ouch
 │       ├── git/hooks/pre-push  secret guardrail, wired by core.hooksPath
 │       └── opencode/           agents, skills, local plugin
 └── home-workstation/           mirrors $HOME on the workstation profile only
