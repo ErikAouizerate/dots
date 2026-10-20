@@ -46,3 +46,69 @@
     version: master
     depth: 1
     update: false
+
+# ---------------------------------------------------------------------------
+# Incus (system containers and virtual machines, every profile)
+# ---------------------------------------------------------------------------
+# The daemon is socket activated and Fedora's preset policy ("disable *")
+# leaves its units disabled, so the socket and the boot-time instance startup
+# are enabled here. incus.service is started by its socket and must not be
+# enabled on its own: incus.socket has the daemon listen on
+# /run/incus/unix.socket, whose owner group is incus-admin.
+- name: Enable the Incus socket and instance startup
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - incus.socket
+    - incus-startup.service
+  become: true
+
+# Unprivileged containers map a range of host UIDs/GIDs into the container.
+# Fedora ships /etc/subuid, /etc/subgid and newuidmap/newgidmap, so Incus reads
+# the root ranges there instead of assuming its own default, and it refuses to
+# create a container when that range is shorter than 65536. 1000000:1000000000
+# is the default Incus uses on hosts without a shadow setup.
+- name: Give root the subordinate UID and GID ranges Incus maps containers to
+  ansible.builtin.lineinfile:
+    path: "{{ item }}"
+    regexp: '^root:'
+    line: root:1000000:1000000000
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - /etc/subuid
+    - /etc/subgid
+  become: true
+
+# incus-admin is the group of the daemon socket, which is what makes `incus`
+# usable without sudo. It comes with the package; a session opened before this
+# run does not have it yet, so the user has to log in again.
+- name: Allow the user to use Incus without sudo (incus-admin group)
+  ansible.builtin.user:
+    name: "{{ ansible_facts.user_id }}"
+    groups: incus-admin
+    append: true
+  become: true
+
+# A daemon with no storage pool cannot create anything, so the first run gives
+# it Incus's own minimal setup: the "default" pool (btrfs when /var/lib/incus
+# sits on btrfs, the dir driver otherwise) and the incusbr0 bridge, both
+# attached to the default profile. Listing the pools first leaves a machine
+# that was initialised by hand untouched.
+- name: List the Incus storage pools
+  ansible.builtin.command:
+    cmd: incus storage list --format csv
+  register: base_incus_storage
+  changed_when: false
+  become: true
+
+- name: Initialize Incus (default storage pool and incusbr0)
+  ansible.builtin.command:
+    cmd: incus admin init --minimal
+  when: base_incus_storage.stdout | trim == ''
+  changed_when: true
+  become: true

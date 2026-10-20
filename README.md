@@ -51,7 +51,7 @@ dots/
 │   ├── inventory.yml           localhost
 │   ├── playbook.yml            the four roles, and the profile switch
 │   └── roles/
-│       ├── base/               CLI packages, mise, zsh/oh-my-zsh, login shell
+│       ├── base/               CLI packages, mise, zsh/oh-my-zsh, Incus, login shell
 │       ├── dotfiles/           the symlinks from both home trees into $HOME
 │       ├── workstation/        the Fedora desktop layer (workstation only)
 │       └── user_tools/         mise runtimes, opencode, plugin dependencies
@@ -80,7 +80,7 @@ dots/
 
 | Profile | What it adds |
 | --- | --- |
-| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, FiraCode Nerd Font, libinput-gestures, starship, Bitwarden (Flatpak), the Ptyxis `dconf` settings, the DankMaterialShell layout and the VSCode extensions |
+| `workstation` | the MiracleWM desktop layer: Brave, Chrome, Sublime Text, VLC, ptyxis, wtype, baobab, Virtual Machine Manager (KVM/QEMU), FiraCode Nerd Font, libinput-gestures, starship, Bitwarden (Flatpak), the Ptyxis `dconf` settings, the DankMaterialShell layout and the VSCode extensions |
 | `vps` | nothing beyond `base`, `dotfiles` and `user_tools`: no graphical package and none of the configuration in `home-workstation/`. starship is not installed either, so the prompt is the plain oh-my-zsh theme |
 
 The `workstation` profile expects the **Fedora MiracleWM spin** as its base: it
@@ -96,6 +96,22 @@ the playbook is how it is re-applied. The same goes for the clipboard history
 (`clsettings.json`, 500 entries). A machine whose session has not started yet
 has no `settings.json`: the run says so and skips, and the playbook can be run
 again from the session.
+
+Virtual Machine Manager comes with KVM/QEMU and the default libvirt network
+(nat on `virbr0`), and the user is added to the `libvirt` group, so virt-manager
+manages the system VMs without asking for the root password. Like any group
+change, it needs a new session: log out and back in after the first run.
+
+Incus is installed on every profile, `vps` included: the `base` role installs
+it, enables its socket and instance startup, gives root the subordinate UID/GID
+range containers are mapped to, and adds the user to `incus-admin`, which is
+what makes `incus` work without `sudo`. On the first run it is initialised with
+`incus admin init --minimal`: a `default` storage pool (btrfs when
+`/var/lib/incus` sits on btrfs, the `dir` driver otherwise) and the `incusbr0`
+bridge, attached to the default profile. A machine that already has a storage
+pool is left alone, so a pool created by hand is never replaced. Group changes
+need a new session, and the first login after the run is also the first time
+`incus` can be used without `sudo`.
 
 miracle-wm and libinput-gestures exec the commands of their bindings without a
 shell, so they expand neither `~` nor `$HOME`, and the compositor's PATH does not

@@ -10,6 +10,16 @@ workstation_packages:
   - slurp
   - wl-clipboard
   - wtype
+  # Fedora, virtualization: the mandatory and default packages of the
+  # "virtualization" group. Fedora enables libvirt's modular daemons by
+  # systemd preset, so they are socket activated and nothing has to be
+  # started by hand.
+  - libvirt-daemon-config-network
+  - libvirt-daemon-kvm
+  - qemu-kvm
+  - virt-install
+  - virt-manager
+  - virt-viewer
   # RPM Fusion
   - vlc
   - vlc-plugins-freeworld

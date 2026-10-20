@@ -9,6 +9,10 @@ base_packages:
   - git
   - gitleaks
   - htop
+  - incus
+  # incusd execs `ip`, which a minimal Fedora install does not necessarily
+  # ship even though the incus package does not pull it in.
+  - iproute
   - jq
   - nano
   - ripgrep
