@@ -46,6 +46,7 @@ playbook is idempotent and converges the machine again.
 ```
 dots/
 ├── install-fedora.sh           bootstrap: Ansible, checkout, playbook
+├── CHEATSHEET.md               the installed CLI tools, one page
 ├── kali/kali-install.sh        the Kali VM: toolchain, share, desktop tweaks
 ├── ansible.cfg
 ├── ansible/
@@ -76,6 +77,11 @@ dots/
         ├── bin/                wm-* compositor helpers
         └── share/applications/ baobab desktop entry
 ```
+
+`CHEATSHEET.md` is the page to keep at hand: what each CLI tool is for and the
+few commands that cover most of the usage — `tldr`, `rg`, `bat`, `tree`, `eza`,
+`htop`, `fd`, `fzf`, `zoxide`, `ouch`, `jq`, `direnv` and `gitleaks`. The tools
+that this repository does not install (`eza`, `zoxide`) are marked as such.
 
 ## Profiles
 
