@@ -6,7 +6,11 @@
 # and takes the prompt over.
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
-plugins=(git)
+# The fzf plugin loads fzf's shell integration (`fzf --zsh`, fzf >= 0.48):
+# Ctrl-R searches the history, Ctrl-T inserts a file path, Alt-C jumps to a
+# directory. Fedora ships fzf without any zsh init, so the plugin is what
+# wires the key bindings.
+plugins=(git fzf)
 source "$ZSH/oh-my-zsh.sh"
 
 # Prompt on the workstation profile (see ~/.config/starship.toml)
