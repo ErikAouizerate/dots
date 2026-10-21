@@ -188,6 +188,34 @@
     append: true
   become: true
 
+# The console of a VM grabs the keyboard, and while it holds it the compositor
+# never sees its own shortcuts: Mod+Enter, Mod+1..9 and friends do nothing in
+# the VM window. The grab is driven by a property of the SPICE display widget
+# that virt-manager never sets, so the viewer is patched (see
+# workstation_virtmanager_viewer_patch). Reading the file first keeps the run
+# idempotent: a patched console has to stay untouched, or replace would insert
+# the lines again on every run.
+- name: Look for the virt-manager SPICE viewer
+  ansible.builtin.stat:
+    path: "{{ workstation_virtmanager_viewer }}"
+  register: workstation_vm_viewer
+
+- name: Read the SPICE viewer source
+  ansible.builtin.slurp:
+    src: "{{ workstation_virtmanager_viewer }}"
+  register: workstation_vm_viewer_source
+  when: workstation_vm_viewer.stat.exists
+
+- name: Stop the SPICE viewer from grabbing the keyboard
+  ansible.builtin.replace:
+    path: "{{ workstation_virtmanager_viewer }}"
+    regexp: '^ *({{ workstation_virtmanager_viewer_anchor | regex_escape }})$'
+    replace: "{{ workstation_virtmanager_viewer_anchor }}\n{{ workstation_virtmanager_viewer_patch | join('\n') }}"
+  become: true
+  when:
+    - workstation_vm_viewer.stat.exists
+    - workstation_virtmanager_viewer_patch[1] not in (workstation_vm_viewer_source.content | b64decode)
+
 # ---------------------------------------------------------------------------
 # Brave
 # ---------------------------------------------------------------------------

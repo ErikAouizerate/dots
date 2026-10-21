@@ -7,7 +7,7 @@
   Validate changes with static checks instead and let the user confirm the result in the VM:
 
   ```sh
-  shellcheck -x install-fedora.sh home/.local/bin/wm-* home/.config/git/hooks/pre-push
+  shellcheck -x install-fedora.sh kali/kali-install.sh home/.local/bin/wm-* home/.config/git/hooks/pre-push
   ansible-lint ansible/
   ansible-playbook ansible/playbook.yml --syntax-check
   ```

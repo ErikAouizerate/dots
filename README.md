@@ -46,6 +46,7 @@ playbook is idempotent and converges the machine again.
 ```
 dots/
 ├── install-fedora.sh           bootstrap: Ansible, checkout, playbook
+├── kali/kali-install.sh        the Kali VM: toolchain, share, desktop tweaks
 ├── ansible.cfg
 ├── ansible/
 │   ├── inventory.yml           localhost
@@ -100,7 +101,9 @@ again from the session.
 Virtual Machine Manager comes with KVM/QEMU and the default libvirt network
 (nat on `virbr0`), and the user is added to the `libvirt` group, so virt-manager
 manages the system VMs without asking for the root password. Like any group
-change, it needs a new session: log out and back in after the first run.
+change, it needs a new session: log out and back in after the first run. The role
+also patches the viewer so that the console leaves the keyboard to the desktop
+(see [The Kali VM](#the-kali-vm)).
 
 Incus is installed on every profile, `vps` included: the `base` role installs
 it, enables its socket and instance startup, gives root the subordinate UID/GID
@@ -121,6 +124,69 @@ contain `~/.local/bin`. The `wm-*` helpers are therefore linked into
 `~`, `$HOME` or a PATH lookup, so a machine where the user is not `riko` works
 the same.
 
+## The Kali VM
+
+The pentest VM runs on the workstation's libvirt and is deliberately outside this
+playbook: it is Debian-based (every role here is `dnf`'s) and it does not read the
+dotfiles. What it needs comes from `kali/kali-install.sh`, which is idempotent and
+is also its update command:
+
+```sh
+curl -fsSL https://github.com/ErikAouizerate/dots/raw/main/kali/kali-install.sh | bash
+./kali/kali-install.sh --no-gui     # from a checkout, without the desktop tweaks
+```
+
+It installs the toolchain (`mise`, node through mise, `pi`), mounts the directory
+the host shares over virtiofs at `~/host`, and applies the two desktop tweaks
+below. The share itself is declared on the host, in the VM definition: a
+`<filesystem>` device of type `virtiofs` with the tag `host`, which is the tag the
+script writes in `/etc/fstab`.
+
+### Super belongs to the host
+
+virt-manager's SPICE console grabs the keyboard while it has the focus, and that
+grab is what makes the compositor ignore its own shortcuts. No preference exposes
+it, so the `workstation` role inserts two lines into the viewer
+(`/usr/share/virt-manager/virtManager/details/viewers.py`):
+
+```python
+display.set_property("grab-keyboard", False)
+```
+
+A virt-manager upgrade restores that file, and the next run of the playbook
+patches it again. With the grab off, a key reaches the host **and** the guest, so
+`Mod+Enter` opens the host terminal while the VM console has the focus. Two
+consequences, both handled by `kali-install.sh` for the first and worth knowing
+for the second:
+
+- the guest has to give Super up, otherwise it answers its own `Mod4` bindings
+  first. The script maps `Super_L` to `NoSymbol` **and** clears the `mod4`
+  modifier (dropping the keysym alone leaves `Mod4+key` bindings working), then
+  replays both at login from an XFCE autostart entry;
+- the host's shortcuts stay live inside the VM window: `Mod+a` kills the focused
+  window, which can be the console, and `Mod+1..9` switches workspaces.
+
+The VM gets `Alt+Enter` for its own terminal instead: the host binds no `Alt`.
+
+### Console scaling and the pointer
+
+Three keys of virt-manager's `org.virt-manager.virt-manager.console` schema decide
+how the console is drawn. They are preferences, so they are documented here and
+not enforced by the role:
+
+| Key | Values | Meaning |
+| --- | --- | --- |
+| `grab-keys` | string, empty by default | sequence that releases the keyboard (`Ctrl+Alt` when empty); not needed any more with the viewer patched |
+| `scaling` | `0` never, `1` fullscreen only, `2` always | whether the framebuffer is scaled to fit the console window |
+| `resize-guest` | `0` off, `1` on | whether the guest resolution follows the console window |
+
+The workstation's panel is a 2880x1800 `eDP-1` at sway's scale 1.5, and that
+fraction is what makes `scaling = 2` a bad trade here: GTK3 cannot express 1.5,
+sway announces 2 to it and scales the surface itself, and spice-gtk rounds the
+pointer coordinates of the windowed console — clicks land a few pixels off, and
+are exact in fullscreen. The console is therefore used in fullscreen, with
+`resize-guest` on so the guest keeps matching the window.
+
 ## Adding a configuration file
 
 Put it in `home/` at the path it should have in `$HOME`. A file that only makes
@@ -139,7 +205,7 @@ is where secrets, extra aliases and tools installed by hand belong.
 ## Working on the repository
 
 ```sh
-shellcheck -x install-fedora.sh home-workstation/.local/bin/wm-* home/.config/git/hooks/pre-push
+shellcheck -x install-fedora.sh kali/kali-install.sh home-workstation/.local/bin/wm-* home/.config/git/hooks/pre-push
 ansible-lint ansible/
 ansible-playbook ansible/playbook.yml --syntax-check
 ```
@@ -157,7 +223,8 @@ cloning into `~/dots`, and everything after the profile is forwarded to
 
 - `~/.config/opencode/service.json`, which holds the service password. The
   tokens referenced as `{env:...}` in `opencode.json` are set per machine with
-  `opencode service set env <NAME> <value>`.
-- VSCode extensions other than the ones listed in the `workstation` role.
+  `opencode service set env <NAME> <value>`.- VSCode extensions other than the ones listed in the `workstation` role.
+- The Kali VM itself: `kali/kali-install.sh` sets it up, the playbook never
+  touches it.
 - Flatpaks other than Bitwarden.
 - The first `mise install` downloads the runtimes (around 1 GB).

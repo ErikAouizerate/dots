@@ -44,6 +44,20 @@ workstation_vscode_extensions:
   - redhat.vscode-yaml
   - stylelint.vscode-stylelint
 
+# virt-manager's SPICE viewer grabs the keyboard while a VM console has the
+# focus, and that grab is what makes the host compositor ignore its own
+# shortcuts (Mod+Enter, Mod+1..9, ...). The grab follows a property of the
+# SPICE display widget that virt-manager never sets and that no preference
+# exposes, so the two lines below are inserted into the viewer: spice-gtk then
+# leaves the keyboard alone, and the keys still reach the guest. A virt-manager
+# upgrade restores the original file, and the next run of this role patches it
+# again.
+workstation_virtmanager_viewer: /usr/share/virt-manager/virtManager/details/viewers.py
+workstation_virtmanager_viewer_anchor: '            display = SpiceClientGtk.Display.new(self._spice_session, channel_id)'
+workstation_virtmanager_viewer_patch:
+  - '            # patched: keep the keyboard grab off, the host handles its own shortcuts'
+  - '            display.set_property("grab-keyboard", False)'
+
 # Compositor helpers, linked from ~/.local/bin into /usr/local/bin.
 # miracle-wm and libinput-gestures exec the commands of their bindings without
 # a shell and without expanding "~", so the bare name has to resolve on the
