@@ -14,7 +14,11 @@ base_packages:
   # ship even though the incus package does not pull it in.
   - iproute
   - jq
+  - make
   - nano
+  # coi isolates the network of its containers with nft, which a minimal
+  # Fedora install does not necessarily ship.
+  - nftables
   - ripgrep
   - tldr
   - tree
