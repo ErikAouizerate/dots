@@ -56,7 +56,7 @@ dots/
 │       ├── base/               CLI packages, mise, zsh/oh-my-zsh, Incus, login shell
 │       ├── dotfiles/           the symlinks from both home trees into $HOME
 │       ├── workstation/        the Fedora desktop layer (workstation only)
-│       └── user_tools/         mise runtimes, opencode, plugin dependencies
+│       └── user_tools/         mise runtimes, opencode, coi, plugin dependencies
 ├── home/                       mirrors $HOME on every machine, file by file
 │   ├── .zshrc
 │   ├── .zshenv
@@ -121,6 +121,21 @@ bridge, attached to the default profile. A machine that already has a storage
 pool is left alone, so a pool created by hand is never replaced. Group changes
 need a new session, and the first login after the run is also the first time
 `incus` can be used without `sudo`.
+
+coi (Code on Incus) runs a coding agent in a disposable system container on top
+of that Incus daemon, so it comes with `user_tools` and both profiles have it.
+The role runs the project's installer unattended and as root: the installer
+drives `sudo` for its system steps and reads the Incus version through it, which
+an unattended run cannot do as a plain user. The binary therefore lands in
+`/usr/local/bin`, like the `wm-*` helpers, and the storage step the installer
+performs without asking applies too — a loop-backed `btrfs-pool` of half the
+disk becomes the root device of the default Incus profile, which is what makes
+its containers start in a fraction of a second. The one step left to the user is
+the passwordless rule for `nft`: it is security-relevant, the installer asks
+before adding it, and `coi health --fix` installs it — with the
+`cap_linux_immutable` capability on the binary — when network isolation is
+wanted. `coi build` builds the container image, `coi shell` starts a session,
+`coi --help` lists the rest.
 
 miracle-wm and libinput-gestures exec the commands of their bindings without a
 shell, so they expand neither `~` nor `$HOME`, and the compositor's PATH does not

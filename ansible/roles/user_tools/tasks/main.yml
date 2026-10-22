@@ -32,3 +32,32 @@
     cmd: mise exec -- npm ci
     chdir: "{{ ansible_facts.env.HOME }}/.config/opencode/plugins/ponytail"
     creates: "{{ ansible_facts.env.HOME }}/.config/opencode/plugins/ponytail/node_modules"
+
+# coi (Code on Incus) runs a coding agent in a disposable system container on
+# top of the Incus daemon the base role installs, so every profile gets it.
+# Fedora packages neither it nor an equivalent, and piping its installer into
+# bash is the installation method the project documents.
+#
+# It runs as root, which is the only way an unattended run can work: the
+# installer calls sudo for its system steps and reads the Incus version through
+# it, so as a plain user those calls fail as soon as sudo wants a password and
+# the script aborts. As root they all succeed, and the binary lands in
+# /usr/local/bin, next to the wm-* helpers. HOME points at root's home so the
+# pattern databases the installer fetches at the end do not end up root-owned in
+# the user's home: `coi update patterns` fetches them as the user when needed.
+# NONINTERACTIVE answers the remaining questions, which are the ones about
+# installing Incus, joining incus-admin and the root-level extras — the base
+# role already does the first two. The passwordless rule for nft is left to
+# `coi health --fix`, which the user runs when he wants network isolation.
+# creates: keeps the run idempotent, so upgrading means removing the binary.
+- name: Install coi # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      curl -fsSL https://raw.githubusercontent.com/coipond/coi/master/install.sh |
+      bash
+    creates: /usr/local/bin/coi
+  environment:
+    NONINTERACTIVE: "1"
+    HOME: /root
+  become: true
